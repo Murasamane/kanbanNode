@@ -53,3 +53,58 @@ exports.createBoard = async (req, res) => {
     });
   }
 };
+
+exports.createNewColumn = async (req, res) => {
+  try {
+    const board = await Board.findOneAndUpdate(
+      { _id: req.params.id },
+      {
+        $push: {
+          columns: {
+            ...req.body,
+          },
+        },
+      }
+    );
+    res.status(201).json({
+      status: "success",
+      data: {
+        board,
+      },
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+
+exports.createNewTask = async (req, res) => {
+  try {
+    const column = await Board.updateOne(
+      { _id: req.params.id },
+      {
+        $push: {
+          "columns.$[column].tasks": {
+            ...req.body,
+          },
+        },
+      },
+      {
+        arrayFilters: [{ "column.name": req.params.columnName }],
+      }
+    );
+
+    res.status(201).json({
+      status: "success",
+      message: "successfully created the task",
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+
