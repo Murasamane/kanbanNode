@@ -43,7 +43,7 @@ exports.createBoard = async (req, res) => {
     res.status(201).json({
       status: "success",
       data: {
-        board,y
+        board,
       },
     });
   } catch (err) {
