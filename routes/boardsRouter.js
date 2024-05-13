@@ -15,6 +15,6 @@ const router = express.Router();
 
 router.route("/").get(getAllBoards).post(createBoard);
 router.route("/:id").get(getBoard).post(createNewColumn).delete(deleteBoard);
-router.route("/:id/:columnName").post(createNewTask).delete(deleteColumn);
-router.route("/:id/:columnName/:taskId").delete(deleteTask);
+router.route("/:id/:columnId").post(createNewTask).delete(deleteColumn);
+router.route("/:id/:columnId/:taskId").delete(deleteTask);
 module.exports = router;

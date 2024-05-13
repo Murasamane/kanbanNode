@@ -22,6 +22,7 @@ exports.getBoard = async (req, res) => {
   try {
     const board = await Board.findById(req.params.id);
 
+    if (!board) throw new Error("Board not found");
     res.status(200).json({
       status: "success",
       data: {
@@ -92,7 +93,7 @@ exports.createNewTask = async (req, res) => {
         },
       },
       {
-        arrayFilters: [{ "column.name": req.params.columnName }],
+        arrayFilters: [{ "column._id": req.params.columnId }],
       }
     );
 
@@ -115,12 +116,12 @@ exports.deleteTask = async (req, res) => {
       {
         $pull: {
           "columns.$[column].tasks": {
-            id: req.params.taskId,
+            _id: req.params.taskId,
           },
         },
       },
       {
-        arrayFilters: [{ "column.name": req.params.columnName }],
+        arrayFilters: [{ "column._id": req.params.columnId }],
       }
     );
 
@@ -138,7 +139,7 @@ exports.deleteTask = async (req, res) => {
 
 exports.deleteColumn = async (req, res) => {
   try {
-    const board = await Board.findOneAndUpdate(
+    const board = await Board.findByIdAndUpdate(
       { _id: req.params.id },
       {
         $pull: {
@@ -162,8 +163,9 @@ exports.deleteColumn = async (req, res) => {
 
 exports.deleteBoard = async (req, res) => {
   try {
-    const board = await Board.findOneAndDelete(req.params.id);
+    const board = await Board.findByIdAndDelete(req.params.id);
 
+    if (!board) throw new Error("Board not found");
     res.status(201).json({
       status: "success",
       message: `Successfully deleted the Board`,
