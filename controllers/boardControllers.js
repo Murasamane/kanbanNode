@@ -108,3 +108,70 @@ exports.createNewTask = async (req, res) => {
   }
 };
 
+exports.deleteTask = async (req, res) => {
+  try {
+    const column = await Board.updateOne(
+      { _id: req.params.id },
+      {
+        $pull: {
+          "columns.$[column].tasks": {
+            id: req.params.taskId,
+          },
+        },
+      },
+      {
+        arrayFilters: [{ "column.name": req.params.columnName }],
+      }
+    );
+
+    res.status(201).json({
+      status: "success",
+      message: "successfully deleted the task",
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+
+exports.deleteColumn = async (req, res) => {
+  try {
+    const board = await Board.findOneAndUpdate(
+      { _id: req.params.id },
+      {
+        $pull: {
+          columns: {
+            name: req.params.columnName,
+          },
+        },
+      }
+    );
+    res.status(201).json({
+      status: "success",
+      message: `Successfully deleted the column ${req.params.columnName}`,
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+
+exports.deleteBoard = async (req, res) => {
+  try {
+    const board = await Board.findOneAndDelete(req.params.id);
+
+    res.status(201).json({
+      status: "success",
+      message: `Successfully deleted the Board`,
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
