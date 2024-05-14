@@ -37,6 +37,26 @@ exports.getBoard = async (req, res) => {
   }
 };
 
+exports.updateBoard = async (req, res) => {
+  try {
+    const board = await Board.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(201).json({
+      status: "success",
+      data: {
+        board,
+      },
+    });
+  } catch (err) {
+    res.status(404).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
 exports.createBoard = async (req, res) => {
   try {
     const board = await Board.create(req.body);
@@ -55,6 +75,30 @@ exports.createBoard = async (req, res) => {
   }
 };
 
+exports.updateColumn = async (req, res) => {
+  try {
+    const column = await Board.updateOne(
+      { _id: req.params.id, "columns._id": req.params.columnId },
+      { $set: { "columns.$": req.body } },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    res.status(201).json({
+      status: "success",
+      data: {
+        column,
+      },
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
 exports.createNewColumn = async (req, res) => {
   try {
     const board = await Board.findOneAndUpdate(
@@ -82,6 +126,37 @@ exports.createNewColumn = async (req, res) => {
   }
 };
 
+exports.updateTask = async (req, res) => {
+  try {
+    const result = await Board.updateOne(
+      { _id: req.params.id },
+      {
+        $set: {
+          "columns.$[column].tasks.$[task]": req.body,
+        },
+      },
+      {
+        arrayFilters: [
+          { "column._id": req.params.columnId },
+          { "task._id": req.params.taskId },
+        ],
+      },
+      {
+        new: true,
+      }
+    );
+
+    res.status(201).json({
+      status: "success",
+      message: "task updated successfully",
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
 exports.createNewTask = async (req, res) => {
   try {
     const { title, description } = req.body;
@@ -215,6 +290,24 @@ exports.deleteBoard = async (req, res) => {
   } catch (err) {
     res.status(401).json({
       status: "failed",
+      message: err.message,
+    });
+  }
+};
+
+exports.getBoardsInfo = async (req, res) => {
+  try {
+    const boards = await Board.find({}, "_id name");
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        boards,
+      },
+    });
+  } catch (err) {
+    res.status(404).json({
+      status: "fail",
       message: err.message,
     });
   }
