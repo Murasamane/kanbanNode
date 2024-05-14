@@ -65,7 +65,8 @@ exports.createNewColumn = async (req, res) => {
             ...req.body,
           },
         },
-      }
+      },
+      { new: true, runValidators: true }
     );
     res.status(201).json({
       status: "success",
@@ -83,6 +84,11 @@ exports.createNewColumn = async (req, res) => {
 
 exports.createNewTask = async (req, res) => {
   try {
+    const { title, description } = req.body;
+
+    if (title === "" || description === "")
+      throw new Error("Name or Description is empty");
+
     const column = await Board.updateOne(
       { _id: req.params.id },
       {
@@ -94,7 +100,8 @@ exports.createNewTask = async (req, res) => {
       },
       {
         arrayFilters: [{ "column._id": req.params.columnId }],
-      }
+      },
+      { new: true, runValidators: true }
     );
 
     res.status(201).json({
@@ -109,6 +116,41 @@ exports.createNewTask = async (req, res) => {
   }
 };
 
+exports.createSubTask = async (req, res) => {
+  try {
+    const { title } = req.body;
+
+    if (title === "") throw new Error("Name or Description is empty");
+
+    const column = await Board.updateOne(
+      { _id: req.params.id },
+      {
+        $push: {
+          "columns.$[column].tasks.$[task].subtasks": {
+            ...req.body,
+          },
+        },
+      },
+      {
+        arrayFilters: [
+          { "column._id": req.params.columnId },
+          { "task._id": req.params.taskId },
+        ],
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.status(201).json({
+      status: "success",
+      message: "successfully created the subtask",
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
 exports.deleteTask = async (req, res) => {
   try {
     const column = await Board.updateOne(
