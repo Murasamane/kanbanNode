@@ -75,76 +75,24 @@ exports.createBoard = async (req, res) => {
   }
 };
 
-exports.updateColumn = async (req, res) => {
-  try {
-    const column = await Board.updateOne(
-      { _id: req.params.id, "columns._id": req.params.columnId },
-      { $set: { "columns.$": req.body } },
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
-
-    res.status(201).json({
-      status: "success",
-      data: {
-        column,
-      },
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-exports.createNewColumn = async (req, res) => {
-  try {
-    const board = await Board.findOneAndUpdate(
-      { _id: req.params.id },
-      {
-        $push: {
-          columns: {
-            ...req.body,
-          },
-        },
-      },
-      { new: true, runValidators: true }
-    );
-    res.status(201).json({
-      status: "success",
-      data: {
-        board,
-      },
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
 exports.updateTask = async (req, res) => {
   try {
-    const result = await Board.updateOne(
-      { _id: req.params.id },
-      {
-        $set: {
-          "columns.$[column].tasks.$[task]": req.body,
-        },
-      },
-      {
-        arrayFilters: [
-          { "column._id": req.params.columnId },
-          { "task._id": req.params.taskId },
-        ],
-      },
-      {
-        new: true,
-      }
-    );
+    // Find the board
+    const board = await Board.findById(req.params.id);
+
+    // Find the column
+    const column = board.columns.id(req.params.columnId);
+
+    // Find the task
+    const task = column.tasks.id(req.params.taskId);
+
+    // Update the task fields based on req.body
+    for (let key in req.body) {
+      task[key] = req.body[key];
+    }
+
+    // Save the board
+    await board.save();
 
     res.status(201).json({
       status: "success",
@@ -157,11 +105,12 @@ exports.updateTask = async (req, res) => {
     });
   }
 };
+
 exports.createNewTask = async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, status } = req.body;
 
-    if (title === "" || description === "")
+    if (title === "" || description === "" || !title || !description || !status)
       throw new Error("Name or Description is empty");
 
     const column = await Board.updateOne(
@@ -174,7 +123,7 @@ exports.createNewTask = async (req, res) => {
         },
       },
       {
-        arrayFilters: [{ "column._id": req.params.columnId }],
+        arrayFilters: [{ "column.name": req.params.columnName }],
       },
       { new: true, runValidators: true }
     );
@@ -191,41 +140,6 @@ exports.createNewTask = async (req, res) => {
   }
 };
 
-exports.createSubTask = async (req, res) => {
-  try {
-    const { title } = req.body;
-
-    if (title === "") throw new Error("Name or Description is empty");
-
-    const column = await Board.updateOne(
-      { _id: req.params.id },
-      {
-        $push: {
-          "columns.$[column].tasks.$[task].subtasks": {
-            ...req.body,
-          },
-        },
-      },
-      {
-        arrayFilters: [
-          { "column._id": req.params.columnId },
-          { "task._id": req.params.taskId },
-        ],
-      },
-      { new: true, runValidators: true }
-    );
-
-    res.status(201).json({
-      status: "success",
-      message: "successfully created the subtask",
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
 exports.deleteTask = async (req, res) => {
   try {
     const column = await Board.updateOne(
@@ -245,30 +159,6 @@ exports.deleteTask = async (req, res) => {
     res.status(201).json({
       status: "success",
       message: "successfully deleted the task",
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
-exports.deleteColumn = async (req, res) => {
-  try {
-    const board = await Board.findByIdAndUpdate(
-      { _id: req.params.id },
-      {
-        $pull: {
-          columns: {
-            name: req.params.columnName,
-          },
-        },
-      }
-    );
-    res.status(201).json({
-      status: "success",
-      message: `Successfully deleted the column ${req.params.columnName}`,
     });
   } catch (err) {
     res.status(401).json({
@@ -308,6 +198,118 @@ exports.getBoardsInfo = async (req, res) => {
   } catch (err) {
     res.status(404).json({
       status: "fail",
+      message: err.message,
+    });
+  }
+};
+
+exports.getColumnsList = async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id).select(
+      "name columns._id columns.name"
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        board,
+      },
+    });
+  } catch (err) {
+    res.status(404).json({
+      status: "fail",
+      message: err.message,
+    });
+  }
+};
+exports.updateSubTask = async (req, res) => {
+  try {
+    const { isCompleted } = req.body;
+
+    const column = await Board.updateOne(
+      {
+        _id: req.params.id,
+        "columns._id": req.params.columnId,
+        "columns.tasks._id": req.params.taskId,
+        "columns.tasks.subtasks._id": req.params.subtaskId,
+      },
+      {
+        $set: {
+          "columns.$[column].tasks.$[task].subtasks.$[subtask].isCompleted":
+            isCompleted,
+        },
+      },
+      {
+        arrayFilters: [
+          { "column._id": req.params.columnId },
+          { "task._id": req.params.taskId },
+          { "subtask._id": req.params.subtaskId },
+        ],
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "successfully updated the subtask",
+    });
+  } catch (err) {
+    res.status(400).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+
+exports.updateTaskLocation = async (req, res) => {
+  try {
+    console.log(req.params);
+    const board = await Board.findById({ _id: req.params.id });
+    const column = board.columns.id(req.params.columnId);
+    const destinationColumn = board.columns.id(req.params.destinationColumnId);
+    const task = column.tasks.id(req.params.taskId);
+
+    const currentColumn = await Board.updateOne(
+      { _id: req.params.id },
+      {
+        $pull: {
+          "columns.$[column].tasks": task,
+        },
+      },
+      {
+        arrayFilters: [
+          { "column._id": req.params.columnId },
+          { "task._id": req.params.taskId },
+        ],
+      }
+    );
+
+    const newColumn = await Board.updateOne(
+      { _id: req.params.id },
+      {
+        $push: {
+          "columns.$[column].tasks": task,
+        },
+      },
+      {
+        arrayFilters: [{ "column._id": req.params.destinationColumnId }],
+      }
+    );
+    res.status(200).json({
+      message: "Successfull",
+      data: {
+        task,
+      },
+      column: {
+        column,
+      },
+      destinationColumn: {
+        destinationColumn,
+      },
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
       message: err.message,
     });
   }

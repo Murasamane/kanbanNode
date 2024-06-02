@@ -9,6 +9,7 @@ const BoardSchema = new mongoose.Schema({
   },
   columns: {
     type: [ColumnFieldSchema],
+    unique: true,
     default: [],
   },
 });

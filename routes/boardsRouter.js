@@ -5,35 +5,28 @@ const {
   getAllBoards,
   getBoard,
   createBoard,
-  createNewColumn,
   createNewTask,
   deleteTask,
-  deleteColumn,
+  updateSubTask,
   deleteBoard,
-  createSubTask,
   updateBoard,
-  updateColumn,
   updateTask,
   getBoardsInfo,
+  getColumnsList,
+  updateTaskLocation,
 } = boardControllers;
 const router = express.Router();
 
 router.route("/").get(getAllBoards).post(createBoard);
 router.route("/boardLinks").get(getBoardsInfo);
+router.route("/:id").get(getBoard).put(updateBoard).delete(deleteBoard);
+router.route("/:id/columnInfo").get(getColumnsList);
+router.route("/:id/:columnId/:taskId").patch(updateTask).delete(deleteTask);
+router.route("/:id/create/:columnName").post(createNewTask);
 router
-  .route("/:id")
-  .get(getBoard)
-  .post(createNewColumn)
-  .patch(updateBoard)
-  .delete(deleteBoard);
+  .route("/:id/changeColumn/:columnId/:taskId/:destinationColumnId")
+  .patch(updateTaskLocation);
 router
-  .route("/:id/:columnId")
-  .post(createNewTask)
-  .patch(updateColumn)
-  .delete(deleteColumn);
-router
-  .route("/:id/:columnId/:taskId")
-  .post(createSubTask)
-  .patch(updateTask)
-  .delete(deleteTask);
+  .route("/:id/updateSubtask/:columnId/:taskId/:subtaskId")
+  .patch(updateSubTask);
 module.exports = router;
