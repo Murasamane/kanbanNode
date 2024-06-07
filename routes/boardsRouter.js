@@ -22,7 +22,7 @@ router.route("/boardLinks").get(getBoardsInfo);
 router.route("/:id").get(getBoard).put(updateBoard).delete(deleteBoard);
 router.route("/:id/columnInfo").get(getColumnsList);
 router.route("/:id/:columnId/:taskId").patch(updateTask).delete(deleteTask);
-router.route("/:id/create/:columnName").post(createNewTask);
+router.route("/:id/create/:columnId").post(createNewTask);
 router
   .route("/:id/changeColumn/:columnId/:taskId/:destinationColumnId")
   .patch(updateTaskLocation);

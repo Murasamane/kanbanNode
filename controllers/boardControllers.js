@@ -123,7 +123,7 @@ exports.createNewTask = async (req, res) => {
         },
       },
       {
-        arrayFilters: [{ "column.name": req.params.columnName }],
+        arrayFilters: [{ "column._id": req.params.columnId }],
       },
       { new: true, runValidators: true }
     );
