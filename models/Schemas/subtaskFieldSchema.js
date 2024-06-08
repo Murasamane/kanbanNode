@@ -6,7 +6,7 @@ const SubtaskFieldSchema = new Schema({
   title: {
     type: String,
     required: [true, "Subtask must have a title"],
-    minLength:[1,"subtask must have a title"]
+    minLength: [1, "subtask must have a title"],
   },
   isCompleted: {
     type: Boolean,

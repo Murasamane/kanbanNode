@@ -1,8 +1,18 @@
+const Task = require("../models/taskModel");
+const Column = require("../models/columnModel");
 const Board = require("../models/boardModel");
 
+// Board
+
+// Done
 exports.getAllBoards = async (req, res) => {
   try {
-    const boards = await Board.find();
+    const boards = await Board.find().populate({
+      path: "columns",
+      populate: {
+        path: "tasks",
+      },
+    });
 
     res.status(200).json({
       status: "success",
@@ -17,10 +27,15 @@ exports.getAllBoards = async (req, res) => {
     });
   }
 };
-
+// Done
 exports.getBoard = async (req, res) => {
   try {
-    const board = await Board.findById(req.params.id);
+    const board = await Board.findById(req.params.id).populate({
+      path: "columns",
+      populate: {
+        path: "tasks",
+      },
+    });
 
     if (!board) throw new Error("Board not found");
     res.status(200).json({
@@ -36,19 +51,62 @@ exports.getBoard = async (req, res) => {
     });
   }
 };
-
+// Done
 exports.updateBoard = async (req, res) => {
   try {
-    const board = await Board.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
+    const board = await Board.findById(req.params.id);
+    const { name, columns } = req.body;
+
+    const oldColumns = board.columns.map((col) => col);
+
+    const columnsOldFind = await Column.find({ _id: { $in: oldColumns } });
+    const filteredCols = columns.filter(
+      (col) => !columnsOldFind.some((col2) => col2._id === col._id)
+    );
+
+    const newColumnsToCreate = filteredCols.filter(
+      (obj) => obj._id === undefined
+    );
+
+    const newColumns = newColumnsToCreate.map((colData) => {
+      let column = new Column(colData);
+      column.save();
+
+      board.columns.push(column._id.toString());
+      return column;
     });
+
+    const savedCols = filteredCols.filter((obj) => obj._id !== undefined);
+    const fullNewColumns = [...newColumns, ...savedCols];
+
+    const columnsToDelete = columnsOldFind.filter(
+      (oldCol) =>
+        !fullNewColumns.some(
+          (col) => col._id.toString() === oldCol._id.toString()
+        )
+    );
+
+    const deletionColumns = await Column.find({
+      _id: { $in: columnsToDelete },
+    });
+
+    for (const col of deletionColumns) {
+      const colTasks = col.tasks;
+      for (const task of colTasks) {
+        await Task.findByIdAndDelete(task._id);
+      }
+      await Column.findByIdAndDelete(col._id);
+    }
+    await Board.findByIdAndUpdate(req.params.id, {
+      $pull: { columns: { $in: columnsToDelete } },
+      $set: { name: name },
+    });
+
+    board.save();
 
     res.status(201).json({
       status: "success",
-      data: {
-        board,
-      },
+      message: "board updated successfully",
     });
   } catch (err) {
     res.status(404).json({
@@ -57,6 +115,7 @@ exports.updateBoard = async (req, res) => {
     });
   }
 };
+// Done
 exports.createBoard = async (req, res) => {
   try {
     const board = await Board.create(req.body);
@@ -75,99 +134,7 @@ exports.createBoard = async (req, res) => {
   }
 };
 
-exports.updateTask = async (req, res) => {
-  try {
-    // Find the board
-    const board = await Board.findById(req.params.id);
-
-    // Find the column
-    const column = board.columns.id(req.params.columnId);
-
-    // Find the task
-    const task = column.tasks.id(req.params.taskId);
-
-    // Update the task fields based on req.body
-    for (let key in req.body) {
-      task[key] = req.body[key];
-    }
-
-    // Save the board
-    await board.save();
-
-    res.status(201).json({
-      status: "success",
-      message: "task updated successfully",
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
-exports.createNewTask = async (req, res) => {
-  try {
-    const { title, description, status } = req.body;
-
-    if (title === "" || description === "" || !title || !description || !status)
-      throw new Error("Name or Description is empty");
-
-    const column = await Board.updateOne(
-      { _id: req.params.id },
-      {
-        $push: {
-          "columns.$[column].tasks": {
-            ...req.body,
-          },
-        },
-      },
-      {
-        arrayFilters: [{ "column._id": req.params.columnId }],
-      },
-      { new: true, runValidators: true }
-    );
-
-    res.status(201).json({
-      status: "success",
-      message: "successfully created the task",
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
-exports.deleteTask = async (req, res) => {
-  try {
-    const column = await Board.updateOne(
-      { _id: req.params.id },
-      {
-        $pull: {
-          "columns.$[column].tasks": {
-            _id: req.params.taskId,
-          },
-        },
-      },
-      {
-        arrayFilters: [{ "column._id": req.params.columnId }],
-      }
-    );
-
-    res.status(201).json({
-      status: "success",
-      message: "successfully deleted the task",
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
+// Todo
 exports.deleteBoard = async (req, res) => {
   try {
     const board = await Board.findByIdAndDelete(req.params.id);
@@ -185,6 +152,7 @@ exports.deleteBoard = async (req, res) => {
   }
 };
 
+// Done
 exports.getBoardsInfo = async (req, res) => {
   try {
     const boards = await Board.find({}, "_id name");
@@ -203,10 +171,92 @@ exports.getBoardsInfo = async (req, res) => {
   }
 };
 
+// Task
+
+// Done
+exports.updateTask = async (req, res) => {
+  try {
+    // Find the task
+    const task = await Task.findById(req.params.taskId);
+
+    // Update the task fields based on req.body
+    for (let key in req.body) {
+      task[key] = req.body[key];
+    }
+
+    // Save the board
+    await task.save();
+
+    res.status(201).json({
+      status: "success",
+      message: "task updated successfully",
+      task,
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+// Done
+exports.createNewTask = async (req, res) => {
+  try {
+    const task = await Task.create(req.body);
+    const column = await Column.findByIdAndUpdate(
+      req.params.columnId,
+      {
+        $addToSet: {
+          tasks: task._id,
+        },
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.status(201).json({
+      status: "success",
+      message: "successfully created the task",
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+// Done
+exports.deleteTask = async (req, res) => {
+  try {
+    await Column.updateOne(
+      {
+        _id: req.params.columnId,
+      },
+      {
+        $pull: {
+          tasks: req.params.taskId,
+        },
+      }
+    );
+
+    await Task.findByIdAndDelete(req.params.taskId);
+
+    res.status(201).json({
+      status: "success",
+      message: "Task deleted successfully",
+    });
+  } catch (err) {
+    res.status(401).json({
+      status: "failed",
+      message: err.message,
+    });
+  }
+};
+// Done
 exports.getColumnsList = async (req, res) => {
   try {
-    const board = await Board.findById(req.params.id).select(
-      "name columns._id columns.name"
+    const board = await Board.findById(req.params.id).populate(
+      "columns",
+      "_id name"
     );
 
     res.status(200).json({
@@ -222,29 +272,23 @@ exports.getColumnsList = async (req, res) => {
     });
   }
 };
+// Done
 exports.updateSubTask = async (req, res) => {
   try {
     const { isCompleted } = req.body;
 
-    const column = await Board.updateOne(
+    await Task.updateOne(
       {
-        _id: req.params.id,
-        "columns._id": req.params.columnId,
-        "columns.tasks._id": req.params.taskId,
-        "columns.tasks.subtasks._id": req.params.subtaskId,
+        _id: req.params.taskId,
+        "subtasks._id": req.params.subtaskId,
       },
       {
         $set: {
-          "columns.$[column].tasks.$[task].subtasks.$[subtask].isCompleted":
-            isCompleted,
+          "subtasks.$[subtask].isCompleted": isCompleted,
         },
       },
       {
-        arrayFilters: [
-          { "column._id": req.params.columnId },
-          { "task._id": req.params.taskId },
-          { "subtask._id": req.params.subtaskId },
-        ],
+        arrayFilters: [{ "subtask._id": req.params.subtaskId }],
       },
       { new: true, runValidators: true }
     );
@@ -261,6 +305,7 @@ exports.updateSubTask = async (req, res) => {
   }
 };
 
+// Todo
 exports.updateTaskLocation = async (req, res) => {
   try {
     console.log(req.params);

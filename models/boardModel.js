@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const ColumnFieldSchema = require("./Schemas/columnFieldSchema");
 
 const BoardSchema = new mongoose.Schema({
   name: {
@@ -8,8 +7,7 @@ const BoardSchema = new mongoose.Schema({
     unique: true,
   },
   columns: {
-    type: [ColumnFieldSchema],
-    unique: true,
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Column" }],
     default: [],
   },
 });

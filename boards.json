@@ -1,0 +1,43 @@
+[
+  {
+    "_id": {
+      "$oid": "6642a29b7593e04ac3f4cde8"
+    },
+    "name": "Platform Launch",
+    "columns": [
+      "ce989f427aac960c46dcfff2",
+      "2b42da53c6a1940c3ba931b8",
+      "afdf235a22028f376985c864"
+    ]
+  },
+  {
+    "_id": {
+      "$oid": "6642a29b7593e04ac3f4cde9"
+    },
+    "name": "Marketing Plan",
+    "columns": [
+      "0232b884a36adfdf83c6d6be",
+      "09b6ba08677fac8e2c926a1c",
+      "70236a9ce4ffd04e41a3ff7a"
+    ]
+  },
+  {
+    "_id": {
+      "$oid": "6642a29b7593e04ac3f4cdea"
+    },
+    "name": "Roadmap",
+    "columns": [
+      "4ab6a142498361a16e5d00d2",
+      "d2d6f88b422171b8b654f864",
+      "0ba7b37b0dd0f5f074a68c78"
+    ]
+  },
+  {
+    "_id": {
+      "$oid": "6643d4beb3e94121db3fbf9b"
+    },
+    "name": "test board",
+    "columns": ["665a370894ec0754691acca2"],
+    "__v": 2
+  }
+]
