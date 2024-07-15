@@ -1,7 +1,7 @@
 const Task = require("../models/taskModel");
 const Column = require("../models/columnModel");
 const Board = require("../models/boardModel");
-const mongoose = require("mongoose");
+
 exports.getAllBoards = async (req, res) => {
   try {
     const boards = await Board.find().populate({
@@ -81,7 +81,7 @@ exports.updateBoard = async (req, res) => {
     const savedCols = columnsOldFind.filter((obj) =>
       columns.some((obj2) => obj._id.toString() === obj2._id.toString())
     );
-    
+
     const columnsToDelete = columnsOldFind.filter(
       (oldCol) => !savedCols.some((col) => col._id === oldCol._id)
     );
@@ -89,6 +89,25 @@ exports.updateBoard = async (req, res) => {
     const deletionColumns = await Column.find({
       _id: { $in: columnsToDelete },
     });
+
+    for (const col of columns) {
+      for (const safeCol of savedCols) {
+        if (
+          col._id.toString() === safeCol._id.toString() &&
+          col.name !== safeCol.name
+        ) {
+          const column = await Column.findByIdAndUpdate(safeCol._id, {
+            $set: { name: col.name },
+          });
+
+          for (task of column.tasks) {
+            await Task.findByIdAndUpdate(task._id, {
+              $set: { status: col.name },
+            });
+          }
+        }
+      }
+    }
 
     for (const col of deletionColumns) {
       const colTasks = col.tasks;
@@ -113,7 +132,6 @@ exports.updateBoard = async (req, res) => {
       },
       { new: true, runValidators: true }
     );
-    // board.save();
 
     res.status(201).json({
       status: "success",
@@ -200,9 +218,10 @@ exports.deleteBoard = async (req, res) => {
       message: "Board deleted successfully",
     });
   } catch (err) {
-    res.status(401).json({
+    res.status(500).json({
       status: "failed",
       message: err.message,
+      error: err,
     });
   }
 };
