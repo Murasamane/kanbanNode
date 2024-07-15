@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
-const SubtaskFieldSchema = require("./subtaskFieldSchema");
+const SubtaskFieldSchema = require("./Schemas/subtaskFieldSchema");
 
 const TaskSchema = new Schema({
   _id: { type: Schema.Types.ObjectId, auto: true },

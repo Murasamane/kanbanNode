@@ -1,8 +1,15 @@
+const Task = require("../models/taskModel");
+const Column = require("../models/columnModel");
 const Board = require("../models/boardModel");
 
 exports.getAllBoards = async (req, res) => {
   try {
-    const boards = await Board.find();
+    const boards = await Board.find().populate({
+      path: "columns",
+      populate: {
+        path: "tasks",
+      },
+    });
 
     res.status(200).json({
       status: "success",
@@ -20,7 +27,12 @@ exports.getAllBoards = async (req, res) => {
 
 exports.getBoard = async (req, res) => {
   try {
-    const board = await Board.findById(req.params.id);
+    const board = await Board.findById(req.params.id).populate({
+      path: "columns",
+      populate: {
+        path: "tasks",
+      },
+    });
 
     if (!board) throw new Error("Board not found");
     res.status(200).json({
@@ -39,143 +51,123 @@ exports.getBoard = async (req, res) => {
 
 exports.updateBoard = async (req, res) => {
   try {
-    const board = await Board.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-
-    res.status(201).json({
-      status: "success",
-      data: {
-        board,
-      },
-    });
-  } catch (err) {
-    res.status(404).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-exports.createBoard = async (req, res) => {
-  try {
-    const board = await Board.create(req.body);
-
-    res.status(201).json({
-      status: "success",
-      data: {
-        board,
-      },
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
-exports.updateTask = async (req, res) => {
-  try {
-    // Find the board
     const board = await Board.findById(req.params.id);
+    const { name, columns } = req.body;
 
-    // Find the column
-    const column = board.columns.id(req.params.columnId);
+    const oldColumns = board.columns.map((col) => col);
 
-    // Find the task
-    const task = column.tasks.id(req.params.taskId);
+    const columnsOldFind = await Column.find({ _id: { $in: oldColumns } });
+    const filteredCols = columns.filter(
+      (col) =>
+        !columnsOldFind.some(
+          (col2) => col2._id.toString() === col._id.toString()
+        )
+    );
 
-    // Update the task fields based on req.body
-    for (let key in req.body) {
-      task[key] = req.body[key];
+    const newColumnsToCreate = filteredCols.map((obj) => ({
+      name: obj.name,
+      tasks: [],
+    }));
+
+    const newColumns = [];
+
+    for (const col of newColumnsToCreate) {
+      let column = await Column.create(col);
+      await column.save();
+      const { _id } = column;
+      newColumns.push(_id);
     }
 
-    // Save the board
-    await board.save();
+    const savedCols = columnsOldFind.filter((obj) =>
+      columns.some((obj2) => obj._id.toString() === obj2._id.toString())
+    );
 
-    res.status(201).json({
-      status: "success",
-      message: "task updated successfully",
+    const columnsToDelete = columnsOldFind.filter(
+      (oldCol) => !savedCols.some((col) => col._id === oldCol._id)
+    );
+
+    const deletionColumns = await Column.find({
+      _id: { $in: columnsToDelete },
     });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
 
-exports.createNewTask = async (req, res) => {
-  try {
-    const { title, description, status } = req.body;
+    for (const col of columns) {
+      for (const safeCol of savedCols) {
+        if (
+          col._id.toString() === safeCol._id.toString() &&
+          col.name !== safeCol.name
+        ) {
+          const column = await Column.findByIdAndUpdate(safeCol._id, {
+            $set: { name: col.name },
+          });
 
-    if (title === "" || description === "" || !title || !description || !status)
-      throw new Error("Name or Description is empty");
+          for (task of column.tasks) {
+            await Task.findByIdAndUpdate(task._id, {
+              $set: { status: col.name },
+            });
+          }
+        }
+      }
+    }
 
-    const column = await Board.updateOne(
-      { _id: req.params.id },
+    for (const col of deletionColumns) {
+      const colTasks = col.tasks;
+      for (const task of colTasks) {
+        await Task.findByIdAndDelete(task._id);
+      }
+      await Column.findByIdAndDelete(col._id);
+    }
+    await Board.findByIdAndUpdate(
+      req.params.id,
       {
-        $push: {
-          "columns.$[column].tasks": {
-            ...req.body,
-          },
-        },
+        $pull: { columns: { $in: columnsToDelete } },
+        $set: { name: name },
       },
+      { new: true, runValidators: true }
+    );
+
+    await Board.findByIdAndUpdate(
+      req.params.id,
       {
-        arrayFilters: [{ "column._id": req.params.columnId }],
+        $push: { columns: { $each: newColumns } },
       },
       { new: true, runValidators: true }
     );
 
     res.status(201).json({
       status: "success",
-      message: "successfully created the task",
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
-exports.deleteTask = async (req, res) => {
-  try {
-    const column = await Board.updateOne(
-      { _id: req.params.id },
-      {
-        $pull: {
-          "columns.$[column].tasks": {
-            _id: req.params.taskId,
-          },
-        },
+      data: {
+        newColumns,
+        deletionColumns,
       },
-      {
-        arrayFilters: [{ "column._id": req.params.columnId }],
-      }
-    );
-
-    res.status(201).json({
-      status: "success",
-      message: "successfully deleted the task",
     });
   } catch (err) {
-    res.status(401).json({
+    res.status(404).json({
       status: "failed",
       message: err.message,
+      error: err,
     });
   }
 };
 
-exports.deleteBoard = async (req, res) => {
+exports.createBoard = async (req, res) => {
   try {
-    const board = await Board.findByIdAndDelete(req.params.id);
+    const { name, columns } = req.body;
 
-    if (!board) throw new Error("Board not found");
+    const columnIds = [];
+    for (const col of columns) {
+      const newCol = await Column.create(col);
+      columnIds.push(newCol._id);
+    }
+
+    const board = await Board.create({
+      name: name,
+      columns: columnIds,
+    });
     res.status(201).json({
       status: "success",
-      message: `Successfully deleted the Board`,
+      data: {
+        board,
+      },
     });
   } catch (err) {
     res.status(401).json({
@@ -202,11 +194,43 @@ exports.getBoardsInfo = async (req, res) => {
     });
   }
 };
+exports.deleteBoard = async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+
+    if (!board) throw new Error("Board not found");
+
+    const columns = board.columns;
+
+    for (const col of columns) {
+      const column = await Column.findById(col);
+      const colTasks = column.tasks;
+
+      for (const task of colTasks) {
+        await Task.findByIdAndDelete(task);
+      }
+      await Column.findByIdAndDelete(col);
+    }
+
+    await Board.findByIdAndDelete(req.params.id);
+    res.status(201).json({
+      status: "success",
+      message: "Board deleted successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "failed",
+      message: err.message,
+      error: err,
+    });
+  }
+};
 
 exports.getColumnsList = async (req, res) => {
   try {
-    const board = await Board.findById(req.params.id).select(
-      "name columns._id columns.name"
+    const board = await Board.findById(req.params.id).populate(
+      "columns",
+      "_id name"
     );
 
     res.status(200).json({
@@ -218,98 +242,6 @@ exports.getColumnsList = async (req, res) => {
   } catch (err) {
     res.status(404).json({
       status: "fail",
-      message: err.message,
-    });
-  }
-};
-exports.updateSubTask = async (req, res) => {
-  try {
-    const { isCompleted } = req.body;
-
-    const column = await Board.updateOne(
-      {
-        _id: req.params.id,
-        "columns._id": req.params.columnId,
-        "columns.tasks._id": req.params.taskId,
-        "columns.tasks.subtasks._id": req.params.subtaskId,
-      },
-      {
-        $set: {
-          "columns.$[column].tasks.$[task].subtasks.$[subtask].isCompleted":
-            isCompleted,
-        },
-      },
-      {
-        arrayFilters: [
-          { "column._id": req.params.columnId },
-          { "task._id": req.params.taskId },
-          { "subtask._id": req.params.subtaskId },
-        ],
-      },
-      { new: true, runValidators: true }
-    );
-
-    res.status(200).json({
-      status: "success",
-      message: "successfully updated the subtask",
-    });
-  } catch (err) {
-    res.status(400).json({
-      status: "failed",
-      message: err.message,
-    });
-  }
-};
-
-exports.updateTaskLocation = async (req, res) => {
-  try {
-    console.log(req.params);
-    const board = await Board.findById({ _id: req.params.id });
-    const column = board.columns.id(req.params.columnId);
-    const destinationColumn = board.columns.id(req.params.destinationColumnId);
-    const task = column.tasks.id(req.params.taskId);
-
-    const currentColumn = await Board.updateOne(
-      { _id: req.params.id },
-      {
-        $pull: {
-          "columns.$[column].tasks": task,
-        },
-      },
-      {
-        arrayFilters: [
-          { "column._id": req.params.columnId },
-          { "task._id": req.params.taskId },
-        ],
-      }
-    );
-
-    const newColumn = await Board.updateOne(
-      { _id: req.params.id },
-      {
-        $push: {
-          "columns.$[column].tasks": task,
-        },
-      },
-      {
-        arrayFilters: [{ "column._id": req.params.destinationColumnId }],
-      }
-    );
-    res.status(200).json({
-      message: "Successfull",
-      data: {
-        task,
-      },
-      column: {
-        column,
-      },
-      destinationColumn: {
-        destinationColumn,
-      },
-    });
-  } catch (err) {
-    res.status(401).json({
-      status: "failed",
       message: err.message,
     });
   }
